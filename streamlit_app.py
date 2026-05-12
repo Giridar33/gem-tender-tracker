@@ -12,6 +12,7 @@ Deploy on: https://streamlit.io/cloud  (free, no credit card)
 from __future__ import annotations
 
 import os
+import html as html_lib
 
 import requests
 import pandas as pd
@@ -341,13 +342,9 @@ if st.session_state.last_filter != filter_key:
     st.rerun()
 
 # ── KPI Cards ──────────────────────────────────────────────────────────────────
-col1, col2 = st.columns(2)
-
+col1, = st.columns(1)
 total_db = stats.get("total_tenders", 0)
-active_db = stats.get("active_tenders", 0)
-
 col1.metric("Total Tenders", f"{total_db:,}")
-col2.metric("Active Tenders", f"{active_db:,}")
 
 st.markdown("---")
 
@@ -371,29 +368,30 @@ with tab1:
 
         for tender in results:
             active = is_active(tender.get("end_date"))
-            status_badge = '<span class="badge-active">Active</span>' if active else '<span class="badge-closed">Closed</span>'
+            status_badge = '<span class="badge-active">Open</span>' if active else '<span class="badge-closed">Open</span>'
 
             tags_html = ""
             if tender.get("ai_tags"):
                 for tag in tender["ai_tags"].split(","):
                     tag = tag.strip()
                     if tag:
-                        tags_html += f'<span class="tag-pill">{tag}</span>'
+                        tags_html += f'<span class="tag-pill">{html_lib.escape(tag)}</span>'
 
             ai_badge = '<span class="badge-ai">AI Enriched</span>' if tender.get("ai_summary") else ""
-            ai_block = f'<div class="tender-ai">{tender["ai_summary"]}</div>' if tender.get("ai_summary") else ""
+            ai_block = f'<div class="tender-ai">{html_lib.escape(str(tender["ai_summary"]))}</div>' if tender.get("ai_summary") else ""
 
-            dept = tender.get("department") or "—"
-            loc = tender.get("location") or "—"
-            val = fmt_inr(tender.get("estimated_value_inr"))
-            qty = tender.get("quantity", "—")
-            bid_num = tender.get("bid_number", "—")
-            src = tender.get("source_url", "#")
+            dept = html_lib.escape(str(tender.get("department") or "—"))
+            loc  = html_lib.escape(str(tender.get("location")   or "—"))
+            val  = fmt_inr(tender.get("estimated_value_inr"))
+            qty  = html_lib.escape(str(tender.get("quantity") or "—"))
+            bid_num = html_lib.escape(str(tender.get("bid_number") or "—"))
+            title   = html_lib.escape(str(tender.get("title") or "Untitled Tender"))
+            src  = tender.get("source_url") or "#"
 
             card_html = f"""
             <div class="tender-card">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div class="tender-title">{tender.get("title", "Untitled Tender")}</div>
+                    <div class="tender-title">{title}</div>
                     <div>{status_badge} {ai_badge}</div>
                 </div>
                 <div class="tender-meta">
@@ -404,13 +402,14 @@ with tab1:
                 {tags_html}
                 {ai_block}
                 <div style="margin-top:0.6rem;">
-                    <a href="{src}" target="_blank" style="color:#3b82f6; font-size:0.8rem; text-decoration:none;">
-                        View on GeM ↗
+                    <a href="{src}" target="_blank"
+                       style="color:#3b82f6; font-size:0.8rem; text-decoration:none;">
+                        View on GeM &#8599;
                     </a>
                 </div>
             </div>
             """
-            st.markdown(card_html, unsafe_allow_html=True)
+            st.html(card_html)
 
         # Pagination
         st.markdown("---")
