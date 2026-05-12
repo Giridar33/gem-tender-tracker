@@ -243,14 +243,14 @@ def is_active(end_date_str: str | None) -> bool:
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="main-header">
-    <h1>🏛️ GeM Tender Tracker</h1>
+    <h1>GeM Tender Tracker</h1>
     <p>Live AI-enriched Government e-Marketplace tender intelligence · Updated daily</p>
 </div>
 """, unsafe_allow_html=True)
 
 # ── Sidebar Filters ────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 🔍 Filters")
+    st.markdown("### Filters")
     st.markdown("---")
 
     keyword = st.text_input("Keyword Search", placeholder="e.g. laptop, defence, solar")
@@ -268,7 +268,7 @@ with st.sidebar:
     limit = st.selectbox("Records per page", [20, 50, 100], index=0)
 
     st.markdown("---")
-    st.markdown("### 🤖 AI Status")
+    st.markdown("### AI Status")
     ai_status = fetch_ai_status()
     if ai_status.get("enabled"):
         st.success(f"Gemini {ai_status.get('model', 'AI')} active")
@@ -319,10 +319,10 @@ active_db = stats.get("active_tenders", 0)
 avg_val = stats.get("avg_estimated_value_inr", 0)
 ai_enriched = stats.get("ai_enriched_count", 0)
 
-col1.metric("📋 Total Tenders", f"{total_db:,}")
-col2.metric("✅ Active Tenders", f"{active_db:,}")
-col3.metric("💰 Avg. Value", fmt_inr(avg_val) if avg_val else "—")
-col4.metric("🤖 AI Enriched", f"{ai_enriched:,}" if ai_enriched else "—")
+col1.metric("Total Tenders", f"{total_db:,}")
+col2.metric("Active Tenders", f"{active_db:,}")
+col3.metric("Avg. Value", fmt_inr(avg_val) if avg_val else "—")
+col4.metric("AI Enriched", f"{ai_enriched:,}" if ai_enriched else "—")
 
 st.markdown("---")
 
@@ -335,7 +335,7 @@ if error:
     st.stop()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["📋 Tender List", "📊 Analytics", "🔗 API Reference"])
+tab1, tab2, tab3 = st.tabs(["Tender List", "Analytics", "API Reference"])
 
 # ── Tab 1: Tender List ────────────────────────────────────────────────────────
 with tab1:
@@ -346,7 +346,7 @@ with tab1:
 
         for tender in results:
             active = is_active(tender.get("end_date"))
-            status_badge = '<span class="badge-active">● Active</span>' if active else '<span class="badge-closed">Closed</span>'
+            status_badge = '<span class="badge-active">Active</span>' if active else '<span class="badge-closed">Closed</span>'
 
             tags_html = ""
             if tender.get("ai_tags"):
@@ -355,8 +355,8 @@ with tab1:
                     if tag:
                         tags_html += f'<span class="tag-pill">{tag}</span>'
 
-            ai_badge = '<span class="badge-ai">🤖 AI Enriched</span>' if tender.get("ai_summary") else ""
-            ai_block = f'<div class="tender-ai">💡 {tender["ai_summary"]}</div>' if tender.get("ai_summary") else ""
+            ai_badge = '<span class="badge-ai">AI Enriched</span>' if tender.get("ai_summary") else ""
+            ai_block = f'<div class="tender-ai">{tender["ai_summary"]}</div>' if tender.get("ai_summary") else ""
 
             dept = tender.get("department") or "—"
             loc = tender.get("location") or "—"
@@ -372,9 +372,9 @@ with tab1:
                     <div>{status_badge} {ai_badge}</div>
                 </div>
                 <div class="tender-meta">
-                    🏢 {dept} &nbsp;|&nbsp; 📍 {loc} &nbsp;|&nbsp;
-                    💰 {val} &nbsp;|&nbsp; 📦 Qty: {qty} &nbsp;|&nbsp;
-                    🔖 {bid_num}
+                    Dept: {dept} &nbsp;|&nbsp; Location: {loc} &nbsp;|&nbsp;
+                    Value: {val} &nbsp;|&nbsp; Qty: {qty} &nbsp;|&nbsp;
+                    Bid No: {bid_num}
                 </div>
                 {tags_html}
                 {ai_block}
@@ -470,7 +470,7 @@ with tab2:
                 st.info("No value data available for current results.")
 
         # AI tags cloud
-        st.markdown("#### 🤖 Top AI-Generated Tags")
+        st.markdown("#### Top AI-Generated Tags")
         all_tags: list[str] = []
         for r in results:
             if r.get("ai_tags"):
@@ -500,13 +500,13 @@ with tab2:
             st.info("No AI tags in current results. Run batch enrichment via the API to generate tags.")
 
         # Raw table
-        st.markdown("#### 📥 Export Current Results")
+        st.markdown("#### Export Current Results")
         display_cols = [c for c in ["bid_number", "title", "department", "location",
                                      "estimated_value_inr", "quantity", "end_date",
                                      "ai_summary", "ai_tags"] if c in df.columns]
         st.dataframe(df[display_cols], use_container_width=True, height=300)
         st.download_button(
-            "⬇️ Download as CSV",
+            "Download as CSV",
             data=df[display_cols].to_csv(index=False),
             file_name="gem_tenders.csv",
             mime="text/csv",
@@ -515,7 +515,7 @@ with tab2:
 # ── Tab 3: API Reference ──────────────────────────────────────────────────────
 with tab3:
     st.markdown(f"""
-### 🔗 Live API Endpoints
+### Live API Endpoints
 
 All endpoints are served from: `{API_BASE}`
 
@@ -530,11 +530,11 @@ All endpoints are served from: `{API_BASE}`
 | POST | `/tenders/{{id}}/enrich` | Enrich single tender with Gemini AI |
 | POST | `/ai/enrich-batch` | Batch-enrich all unenriched tenders |
 
-### 📖 Interactive Docs
+### Interactive Docs
 - **Swagger UI**: [{API_BASE}/docs]({API_BASE}/docs)
 - **ReDoc**: [{API_BASE}/redoc]({API_BASE}/redoc)
 
-### 🧪 Example Queries
+### Example Queries
 ```
 # Active tenders from Ministry of Defence
 GET /tenders?department=defence&active_only=true

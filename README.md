@@ -6,10 +6,11 @@
 
 ---
 
-## 🔗 Live Demo
+## Live Demo
 
 | | Link |
 |--|------|
+| **Dashboard (Streamlit)** | https://gem-tender-trackergit-sgfaj5nph4c2ywvfa6hijb.streamlit.app/ |
 | **API Base** | https://web-production-761eb.up.railway.app |
 | **Interactive Docs (Swagger)** | https://web-production-761eb.up.railway.app/docs |
 | **Health Check** | https://web-production-761eb.up.railway.app/health |
