@@ -13,10 +13,9 @@ python-dateutil==2.9.0
 
 # --- Database ---
 sqlalchemy==2.0.49          # Python 3.13 compatible wheel
-# psycopg2-binary requires C++ Build Tools on Windows.
-# For LOCAL DEV: SQLite is used automatically (no driver needed).
-# For PRODUCTION (PostgreSQL): install psycopg2-binary on Linux/Docker:
-#   pip install psycopg2-binary
+# psycopg[binary] — PostgreSQL driver with pre-built wheels (Python 3.13 + Windows compatible)
+# Use scheme: postgresql+psycopg:// in DATABASE_URL
+psycopg[binary]
 alembic==1.13.1
 
 # --- API ---

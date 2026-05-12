@@ -24,23 +24,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Logging setup ──────────────────────────────────────────────────────────────
+# -- Logging setup --------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("scheduler")
 
 
 def run_pipeline() -> None:
-    """Execute one full scrape → clean → load cycle."""
+    """Execute one full scrape -> clean -> load cycle."""
     from src.scraper.fetcher import save_raw, scrape_all_bids
     from src.cleaning.transform import clean
     from src.database.loader import upsert_tenders
     from src.database.models import create_all_tables
 
-    logger.info("═══ Pipeline started ═══")
+    logger.info("=== Pipeline started ===")
 
     # 0. Ensure tables exist
     create_all_tables()
@@ -69,10 +69,10 @@ def run_pipeline() -> None:
 
     # 3. Load
     upserted = upsert_tenders(df_clean)
-    logger.info("═══ Pipeline complete. %d records upserted. ═══", upserted)
+    logger.info("=== Pipeline complete. %d records upserted. ===", upserted)
 
 
-# ── Entry-point ────────────────────────────────────────────────────────────────
+# -- Entry-point ----------------------------------------------------------------
 
 if __name__ == "__main__":
     run_daemon = os.getenv("RUN_DAEMON", "false").lower() == "true"

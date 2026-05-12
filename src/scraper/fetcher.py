@@ -1,12 +1,17 @@
 """
 fetcher.py
-──────────
-Handles all HTTP communication with bidplus.gem.gov.in.
+----------
+Fetches GeM bid listings via the internal JSON API used by the portal.
 
-Responsibilities:
- - Paginate through /all-bids until no records remain.
- - Retry transient failures with exponential back-off (tenacity).
- - Save raw JSON to data/raw/ with a UTC timestamp in the filename.
+Discovery (2026-05-12):
+  - The /all-bids page loads bids via a POST to /all-bids-data
+  - Requires: session cookies from /all-bids + CSRF token matching the cookie
+  - Payload:  JSON.stringify({ page: N, param: {}, filter: {} })
+  - Response: { code: 200, response: { response: { numFound, docs: [...] } } }
+
+Each doc in the response contains fields like:
+  bid_number, bid_title, dept_name, quantity, start_date, end_date,
+  estimated_value, location, source_url, etc.
 """
 
 from __future__ import annotations
@@ -25,14 +30,14 @@ from tenacity import (
     wait_exponential,
 )
 
-from src.scraper.parser import parse_page
-
 logger = logging.getLogger(__name__)
+
+BASE_URL = "https://bidplus.gem.gov.in"
+DATA_URL = f"{BASE_URL}/all-bids-data"
+LANDING_URL = f"{BASE_URL}/all-bids"
 
 RAW_DIR = Path("data/raw")
 RAW_DIR.mkdir(parents=True, exist_ok=True)
-
-BASE_URL = "https://bidplus.gem.gov.in/all-bids"
 
 HEADERS = {
     "User-Agent": (
@@ -40,8 +45,13 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": LANDING_URL,
+    "X-Requested-With": "XMLHttpRequest",
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
 }
+
+PAGE_SIZE = 10   # GeM returns 10 records per page
 
 
 # ── Retry decorator ────────────────────────────────────────────────────────────
@@ -52,53 +62,114 @@ HEADERS = {
     stop=stop_after_attempt(5),
     reraise=True,
 )
-def _get(session: requests.Session, url: str, params: dict, timeout: int) -> requests.Response:
-    response = session.get(url, params=params, headers=HEADERS, timeout=timeout)
-    response.raise_for_status()
-    return response
+def _post(session: requests.Session, payload: dict, csrf: str, timeout: int) -> dict:
+    data = {
+        "payload": json.dumps(payload),
+        "csrf_bd_gem_nk": csrf,
+    }
+    resp = session.post(DATA_URL, data=data, headers=HEADERS, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
 
 
-# ── Main scrape entry-point ────────────────────────────────────────────────────
+# ── Session bootstrap ──────────────────────────────────────────────────────────
+
+def _init_session(timeout: int) -> tuple[requests.Session, str]:
+    """
+    GET the landing page to acquire session cookies and the CSRF token.
+    Returns (session, csrf_token).
+    """
+    session = requests.Session()
+    resp = session.get(LANDING_URL, headers={"User-Agent": HEADERS["User-Agent"]}, timeout=timeout)
+    resp.raise_for_status()
+    csrf = session.cookies.get("csrf_gem_cookie", "")
+    if not csrf:
+        logger.warning("CSRF cookie not found — requests may be rejected.")
+    logger.info("Session initialised. CSRF token: %s...", csrf[:8])
+    return session, csrf
+
+
+# ── Record extraction ──────────────────────────────────────────────────────────
+
+def _val(doc: dict, key: str):
+    """Extract the first element if value is a list, else return as-is."""
+    v = doc.get(key)
+    if isinstance(v, list):
+        return v[0] if v else None
+    return v
+
+
+def _parse_doc(doc: dict) -> dict:
+    """Map a real GeM API doc dict to our standard record schema."""
+    bid_number = _val(doc, "b_bid_number")
+    min_name = _val(doc, "ba_official_details_minName") or ""
+    dept_name = _val(doc, "ba_official_details_deptName") or ""
+    department = " | ".join(filter(None, [min_name, dept_name])) or None
+
+    return {
+        "bid_number": bid_number,
+        "title": _val(doc, "b_category_name") or _val(doc, "bd_category_name"),
+        "department": department,
+        "quantity": str(_val(doc, "b_total_quantity") or ""),
+        "start_date": _val(doc, "final_start_date_sort"),
+        "end_date": _val(doc, "final_end_date_sort"),
+        "estimated_value": None,   # not in listing; requires detail page call
+        "location": None,
+        "source_url": (
+            f"{BASE_URL}/showbidDocument/{bid_number}"
+            if bid_number else None
+        ),
+        "_raw": doc,
+    }
+
+
+# ── Main entry-point ───────────────────────────────────────────────────────────
 
 def scrape_all_bids(
-    base_url: str = BASE_URL,
+    base_url: str = LANDING_URL,
     max_pages: int = 50,
     request_delay: float = 1.5,
     timeout: int = 15,
 ) -> list[dict]:
     """
-    Iterate through paginated bid listings and return a list of raw record dicts.
+    Fetch all GeM bids via the internal JSON API.
 
-    Parameters
-    ----------
-    base_url     : Landing page URL for GeM bid listings.
-    max_pages    : Hard cap on pages fetched per run (safety valve).
-    request_delay: Seconds to sleep between requests (politeness).
-    timeout      : HTTP request timeout in seconds.
-
-    Returns
-    -------
-    list[dict]   : Flat list of raw tender records.
+    Returns a flat list of raw record dicts.
     """
+    session, csrf = _init_session(timeout)
     results: list[dict] = []
-    session = requests.Session()
 
     for page in range(1, max_pages + 1):
-        params = {"page": page}
-        logger.info("Fetching page %d …", page)
+        payload = {
+            "page": page,
+            "param": {},
+            "filter": {},
+        }
+        logger.info("Fetching page %d ...", page)
 
         try:
-            response = _get(session, base_url, params, timeout)
+            data = _post(session, payload, csrf, timeout)
         except requests.RequestException as exc:
-            logger.error("Page %d permanently failed: %s — skipping.", page, exc)
+            logger.error("Page %d permanently failed: %s -- skipping.", page, exc)
             continue
 
-        records = parse_page(response.text)
-        if not records:
-            logger.info("No records on page %d — stopping pagination.", page)
+        if data.get("code") != 200:
+            logger.warning("API returned code %s on page %d -- stopping.", data.get("code"), page)
             break
 
-        logger.info("Page %d → %d records.", page, len(records))
+        try:
+            docs = data["response"]["response"]["docs"]
+        except (KeyError, TypeError):
+            logger.warning("Unexpected API structure on page %d -- stopping.", page)
+            logger.debug("Raw response: %s", str(data)[:500])
+            break
+
+        if not docs:
+            logger.info("No records on page %d -- stopping pagination.", page)
+            break
+
+        records = [_parse_doc(doc) for doc in docs]
+        logger.info("Page %d -> %d records.", page, len(records))
         results.extend(records)
         time.sleep(request_delay)
 
@@ -110,8 +181,12 @@ def scrape_all_bids(
 
 def save_raw(records: list[dict]) -> Path:
     """Persist raw records to data/raw/<timestamp>.json and return the path."""
+    # Remove _raw field before saving to keep files smaller
+    clean_records = [{k: v for k, v in r.items() if k != "_raw"} for r in records]
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_path = RAW_DIR / f"gem_bids_{ts}.json"
-    out_path.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
-    logger.info("Raw data saved → %s", out_path)
+    out_path.write_text(
+        json.dumps(clean_records, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    logger.info("Raw data saved -> %s", out_path)
     return out_path

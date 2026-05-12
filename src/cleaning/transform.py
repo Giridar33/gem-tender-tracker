@@ -35,10 +35,14 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     """
     original_len = len(df)
 
+    # 0. Drop debug columns not needed in the database
+    if "_raw" in df.columns:
+        df = df.drop(columns=["_raw"])
+
     # 1. Drop exact duplicates, then deduplicate on bid_number (keep first)
     df = df.drop_duplicates()
     df = df.drop_duplicates(subset=["bid_number"], keep="first")
-    logger.info("Deduplication: %d → %d rows", original_len, len(df))
+    logger.info("Deduplication: %d -> %d rows", original_len, len(df))
 
     # 2. Normalise text fields
     text_cols = ["title", "department", "location", "bid_number"]

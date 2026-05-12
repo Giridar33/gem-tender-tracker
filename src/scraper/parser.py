@@ -1,12 +1,25 @@
 """
 parser.py
-─────────
+---------
 Parses a single HTML page of GeM bid listings into structured dicts.
 
-Responsibilities:
- - Accept raw HTML text.
- - Extract all tender record fields safely (return None for missing values).
- - Return a list of raw dicts — no cleaning here; that belongs in transform.py.
+Selectors verified against live bidplus.gem.gov.in/all-bids on 2026-05-12.
+
+Page structure (Bootstrap grid, card-style):
+  div#pagi_content
+    div.col-md-12.border.block   <-- one card per bid
+      div.col-md-9
+        p  > strong "BID NO:"  + a.bid_no_hover  (href=/showbidDocument/<id>)
+        div (width:50%; float:left)
+          p  > strong "Items:"  + a (title text)
+          p  > strong "Quantity:"  + text
+        div (width:50%; float:left)
+          p  > strong "Department Name And Address:"
+          p  (organisation name, e.g. "PMO")
+          p  (ministry/dept, e.g. "Department of Atomic Energy")
+      div.col-md-3
+        p  > strong "Start Date:"  + span.start_date
+        p  > strong "End Date:"    + span.end_date
 """
 
 from __future__ import annotations
@@ -14,109 +27,86 @@ from __future__ import annotations
 import logging
 import re
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 logger = logging.getLogger(__name__)
 
+BASE = "https://bidplus.gem.gov.in"
 
-def _safe_text(element, default=None) -> str | None:
-    """Return stripped text from a BS4 element, or default if element is None."""
-    if element is None:
+
+def _text(tag, default=None) -> str | None:
+    """Strip and return text from a BS4 tag, or default if None."""
+    if tag is None:
         return default
-    return element.get_text(strip=True) or default
-
-
-def _safe_attr(element, attr: str, default=None) -> str | None:
-    if element is None:
-        return default
-    return element.get(attr, default)
+    t = tag.get_text(strip=True)
+    return t if t else default
 
 
 def parse_page(html: str) -> list[dict]:
     """
-    Parse a GeM /all-bids HTML page and return a list of raw record dicts.
+    Parse a GeM /all-bids HTML page.
 
-    Each dict contains the following keys (all may be None if missing):
-      - bid_number       : Unique bid/tender reference number
-      - title            : Short description / product name
-      - department       : Buying organisation / ministry
-      - quantity         : Quantity demanded (raw string)
-      - start_date       : Bid opening date (raw string)
-      - end_date         : Bid closing / last date (raw string)
-      - estimated_value  : Estimated bid value (raw string)
-      - location         : Delivery / consignee location
-      - source_url       : Direct link to the bid detail page
+    Returns a list of dicts with keys:
+      bid_number, title, department, quantity,
+      start_date, end_date, estimated_value, location, source_url
     """
     soup = BeautifulSoup(html, "lxml")
     records: list[dict] = []
 
-    # GeM renders bids inside a table or card structure.
-    # Selector is based on the live page structure as of May 2026.
-    # Update selectors if GeM changes its markup.
-    rows = soup.select("div.bid-card, tr.bid-row, div.card")
+    # Each bid is inside div.col-md-12.border.block
+    cards = soup.select("div.col-md-12.border.block")
+    logger.debug("Found %d bid cards on page.", len(cards))
 
-    if not rows:
-        # Fallback: try to grab any table rows that look like bid data
-        rows = soup.select("table tbody tr")
-
-    for row in rows:
+    for card in cards:
         try:
-            record = _extract_record(row)
-            if record.get("bid_number"):   # must have at least a bid number
+            record = _extract(card)
+            if record.get("bid_number"):
                 records.append(record)
-        except Exception as exc:           # noqa: BLE001
-            logger.warning("Skipping malformed row: %s", exc)
+        except Exception as exc:          # noqa: BLE001
+            logger.warning("Skipping malformed card: %s", exc)
 
     return records
 
 
-def _extract_record(row) -> dict:
-    """Extract a single bid record from a BS4 tag."""
-    # ── Try card-style layout first ───────────────────────────────────────────
-    bid_number = (
-        _safe_text(row.select_one("[class*='bid-no'], [class*='bid_no'], td:nth-child(1)"))
-        or _safe_text(row.select_one("strong"))
-    )
+def _extract(card: Tag) -> dict:
+    # ── Bid number + source URL ────────────────────────────────────────────────
+    bid_link = card.select_one("a.bid_no_hover")
+    bid_number = _text(bid_link)
+    href = bid_link.get("href", "") if bid_link else ""
+    source_url = (BASE + href) if href and not href.startswith("http") else href or None
 
-    title = _safe_text(
-        row.select_one("[class*='bid-title'], [class*='title'], td:nth-child(2)")
-    )
+    # ── Left column (col-md-9) ────────────────────────────────────────────────
+    left = card.select_one("div.col-md-9, div.col-xs-12")
 
-    department = _safe_text(
-        row.select_one("[class*='dept'], [class*='organisation'], td:nth-child(3)")
-    )
+    # Title: first <a> after "Items:" strong
+    title = None
+    items_label = _find_strong(card, "Items:")
+    if items_label:
+        items_a = items_label.find_next("a")
+        title = _text(items_a)
 
-    quantity = _safe_text(
-        row.select_one("[class*='qty'], [class*='quantity'], td:nth-child(4)")
-    )
+    # Quantity: text after "Quantity:" strong
+    quantity = None
+    qty_label = _find_strong(card, "Quantity:")
+    if qty_label:
+        # The quantity text is a direct sibling after the <strong>
+        qty_text = qty_label.next_sibling
+        if qty_text:
+            quantity = str(qty_text).strip() or None
 
-    start_date = _safe_text(
-        row.select_one("[class*='start'], [class*='open'], td:nth-child(5)")
-    )
+    # Department: the <p> tags immediately after "Department Name And Address:"
+    department = None
+    dept_label = _find_strong(card, "Department Name And Address:")
+    if dept_label:
+        dept_p = dept_label.find_parent("p")
+        if dept_p:
+            # Grab the next 1-2 sibling <p> tags as department name
+            siblings = [p for p in dept_p.find_next_siblings("p") if p.get_text(strip=True)][:2]
+            department = " | ".join(p.get_text(strip=True) for p in siblings) or None
 
-    end_date = _safe_text(
-        row.select_one("[class*='end'], [class*='close'], [class*='last'], td:nth-child(6)")
-    )
-
-    estimated_value = _safe_text(
-        row.select_one("[class*='value'], [class*='amount'], [class*='price'], td:nth-child(7)")
-    )
-
-    location = _safe_text(
-        row.select_one("[class*='location'], [class*='consignee'], td:nth-child(8)")
-    )
-
-    # Build the detail URL
-    link_tag = row.select_one("a[href]")
-    raw_href = _safe_attr(link_tag, "href")
-    if raw_href:
-        source_url = (
-            raw_href
-            if raw_href.startswith("http")
-            else f"https://bidplus.gem.gov.in{raw_href}"
-        )
-    else:
-        source_url = None
+    # ── Right column (col-md-3) dates ─────────────────────────────────────────
+    start_date = _text(card.select_one("span.start_date"))
+    end_date = _text(card.select_one("span.end_date"))
 
     return {
         "bid_number": bid_number,
@@ -125,7 +115,15 @@ def _extract_record(row) -> dict:
         "quantity": quantity,
         "start_date": start_date,
         "end_date": end_date,
-        "estimated_value": estimated_value,
-        "location": location,
+        "estimated_value": None,   # not shown in listing cards; available in detail page
+        "location": None,          # embedded in department address text
         "source_url": source_url,
     }
+
+
+def _find_strong(card: Tag, label: str):
+    """Return the <strong> tag whose text starts with label, or None."""
+    for strong in card.find_all("strong"):
+        if strong.get_text(strip=True).startswith(label.rstrip(":")):
+            return strong
+    return None
