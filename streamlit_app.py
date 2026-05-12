@@ -312,17 +312,15 @@ if st.session_state.last_filter != filter_key:
     st.rerun()
 
 # ── KPI Cards ──────────────────────────────────────────────────────────────────
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 
 total_db = stats.get("total_tenders", 0)
 active_db = stats.get("active_tenders", 0)
-avg_val = stats.get("avg_estimated_value_inr", 0)
 ai_enriched = stats.get("ai_enriched_count", 0)
 
 col1.metric("Total Tenders", f"{total_db:,}")
 col2.metric("Active Tenders", f"{active_db:,}")
-col3.metric("Avg. Value", fmt_inr(avg_val) if avg_val else "—")
-col4.metric("AI Enriched", f"{ai_enriched:,}" if ai_enriched else "—")
+col3.metric("AI Enriched", f"{ai_enriched:,}" if ai_enriched else "—")
 
 st.markdown("---")
 
