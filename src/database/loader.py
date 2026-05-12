@@ -82,15 +82,24 @@ def query_tenders(
         stmt = select(Tender)
 
         if department:
-            stmt = stmt.where(Tender.department.ilike(f"%{department}%"))
+            stmt = stmt.where(
+                Tender.department.isnot(None),
+                Tender.department.ilike(f"%{department}%"),
+            )
         if location:
-            stmt = stmt.where(Tender.location.ilike(f"%{location}%"))
+            stmt = stmt.where(
+                Tender.location.isnot(None),
+                Tender.location.ilike(f"%{location}%"),
+            )
         if min_value is not None:
             stmt = stmt.where(Tender.estimated_value_inr >= min_value)
         if max_value is not None:
             stmt = stmt.where(Tender.estimated_value_inr <= max_value)
         if keyword:
-            stmt = stmt.where(Tender.title.ilike(f"%{keyword}%"))
+            stmt = stmt.where(
+                Tender.title.isnot(None),
+                Tender.title.ilike(f"%{keyword}%"),
+            )
         if active_only:
             now = datetime.now(timezone.utc)
             stmt = stmt.where(Tender.end_date >= now)
@@ -120,6 +129,7 @@ def get_summary_stats() -> dict:
         return {
             "total_tenders": total,
             "active_tenders": active,
+            "avg_estimated_value_inr": round(avg_value, 2) if avg_value else None,
             "average_estimated_value_inr": round(avg_value, 2) if avg_value else None,
         }
 
