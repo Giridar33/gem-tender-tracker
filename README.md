@@ -35,12 +35,17 @@ GeM Portal (bidplus.gem.gov.in)
             │ clean DataFrame
             ▼
 ┌──────────────────────────────┐
+│  AI Enrichment (Gemini)      │  plain-English summary + category tags (FREE)
+└───────────┬──────────────────┘
+            │ enriched records
+            ▼
+┌──────────────────────────────┐
 │  Database (PostgreSQL/SQLite)│  upsert on bid_number
 └───────────┬──────────────────┘
             │
             ▼
 ┌──────────────────────────────┐
-│  FastAPI (routes.py)         │  GET /tenders • /tenders/{id} • /stats/summary
+│  FastAPI (routes + ai_routes)│  GET /tenders • POST /ai/enrich-batch …
 └──────────────────────────────┘
 
 ──────── Automation ─────────
@@ -62,7 +67,7 @@ Full details: [`docs/architecture.md`](docs/architecture.md)
 | **Database** | Upsert-safe schema with 4 indexes for common filter patterns |
 | **API** | `/tenders` with filters: department, location, keyword, value range, active-only |
 | **Automation** | GitHub Actions cron (daily) or APScheduler daemon |
-| **AI Bonus** | GPT-4o-mini generates plain-English summaries and category tags |
+| **AI Enrichment** | Gemini 1.5 Flash generates plain-English summaries and category tags (free tier, no credit card) |
 
 ---
 
@@ -150,6 +155,30 @@ Returns a single tender by database ID.
 }
 ```
 
+### `GET /ai/status`
+Check whether Gemini AI enrichment is active:
+```json
+{ "enabled": true, "model": "gemini-1.5-flash", "free_tier_rpm": 15, "free_tier_daily": 1500 }
+```
+
+### `POST /tenders/{id}/enrich`
+On-demand enrich a single tender with Gemini (requires `GEMINI_API_KEY`):
+```json
+{
+  "tender_id": 42,
+  "bid_number": "GEM/2024/B/4567890",
+  "ai_summary": "The Ministry of Defence is procuring 50 laptops ...",
+  "ai_tags": "IT Equipment, Laptops, Defence, Procurement"
+}
+```
+
+### `POST /ai/enrich-batch`
+Background-enriches all tenders that have no AI summary yet.
+Returns immediately; enrichment runs in the background:
+```json
+{ "status": "started", "message": "Batch enrichment is running in the background ..." }
+```
+
 ---
 
 ## Running Tests
@@ -173,7 +202,7 @@ Tests use an **in-memory SQLite database** — no external services required.
 | `REQUEST_TIMEOUT` | ❌ | `15` | HTTP timeout (seconds) |
 | `RUN_DAEMON` | ❌ | `false` | `true` = APScheduler daemon mode |
 | `SCHEDULE_CRON` | ❌ | `0 2 * * *` | Cron expression for daemon mode |
-| `OPENAI_API_KEY` | ❌ | — | Enables AI enrichment (bonus) |
+| `GEMINI_API_KEY` | ❌ | — | Enables Gemini AI enrichment (free tier) |
 
 ---
 
@@ -241,9 +270,20 @@ gem-tender-tracker/
 
 ## Bonus: AI Enrichment
 
-When `OPENAI_API_KEY` is set, `src/ai/enrich.py` adds:
-- **`ai_summary`** — plain-English one-sentence description of the tender.
-- **`ai_tags`** — procurement category tags (e.g. `IT Equipment, Laptops, Defence`).
+When `GEMINI_API_KEY` is set, `src/ai/enrich.py` enriches every tender with:
+- **`ai_summary`** — 1–2 sentence plain-English description of what is being procured.
+- **`ai_tags`** — 3–5 procurement category tags (e.g. `IT Equipment, Laptops, Defence`).
+
+Three API endpoints are available:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/ai/status` | GET | Check if Gemini is active |
+| `/tenders/{id}/enrich` | POST | On-demand enrich one tender |
+| `/ai/enrich-batch` | POST | Background-enrich all un-enriched tenders |
+
+**Free tier:** 1,500 requests/day, 15 RPM — no credit card required.  
+Get your key at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
 See [`docs/ai_writeup.md`](docs/ai_writeup.md) for the full design rationale and trade-offs.
 

@@ -35,13 +35,16 @@ elif "psycopg" in DATABASE_URL:
 else:
     _connect_args = {}
 
+_pool_kwargs: dict = {"pool_pre_ping": True}
+if not DATABASE_URL.startswith("sqlite"):
+    # SQLite does not support pool_size / max_overflow
+    _pool_kwargs["pool_size"] = 2
+    _pool_kwargs["max_overflow"] = 5
+
 engine = create_engine(
     DATABASE_URL,
     connect_args=_connect_args,
-    pool_pre_ping=True,
-    # Reduce pool size for Railway free tier (512 MB RAM)
-    pool_size=2,
-    max_overflow=5,
+    **_pool_kwargs,
 )
 
 

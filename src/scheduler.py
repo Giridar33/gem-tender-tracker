@@ -39,6 +39,7 @@ def run_pipeline() -> None:
     from src.cleaning.transform import clean
     from src.database.loader import upsert_tenders
     from src.database.models import create_all_tables
+    from src.ai.enrich import enrich_batch
 
     logger.info("=== Pipeline started ===")
 
@@ -67,8 +68,13 @@ def run_pipeline() -> None:
     df_raw = pd.DataFrame(raw_records)
     df_clean = clean(df_raw)
 
-    # 3. Load
-    upserted = upsert_tenders(df_clean)
+    # 3. AI Enrichment (skipped gracefully if GEMINI_API_KEY is not set)
+    records = df_clean.to_dict(orient="records")
+    enriched_records = enrich_batch(records)
+    df_enriched = pd.DataFrame(enriched_records)
+
+    # 4. Load
+    upserted = upsert_tenders(df_enriched)
     logger.info("=== Pipeline complete. %d records upserted. ===", upserted)
 
 

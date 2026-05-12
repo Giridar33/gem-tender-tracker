@@ -1,65 +1,130 @@
 """
 enrich.py
-─────────
-(Bonus) AI enrichment layer — adds LLM-generated summaries and tags to tenders.
+---------
+AI enrichment layer — adds Gemini-generated summaries and tags to tenders.
 
-Uses the OpenAI Chat Completions API (gpt-4o-mini by default).
-Only runs if OPENAI_API_KEY is set in the environment.
+Uses Google Gemini 1.5 Flash (FREE tier: 1500 requests/day, 15 RPM).
+Get a free API key at: https://aistudio.google.com/app/apikey
+No credit card required.
+
+Set GEMINI_API_KEY in your environment to enable this module.
+Without the key, enrichment is silently skipped.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
+
+# Lazily initialised — only created when the key is present
+_model = None
+
+
+def _get_model():
+    """Return a cached Gemini GenerativeModel, or None if key is missing."""
+    global _model
+    if _model is not None:
+        return _model
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    try:
+        import google.generativeai as genai  # lazy import
+        genai.configure(api_key=api_key)
+        _model = genai.GenerativeModel("gemini-1.5-flash")
+        logger.info("Gemini AI enrichment enabled (gemini-1.5-flash).")
+    except ImportError:
+        logger.warning("google-generativeai not installed. Run: pip install google-generativeai")
+    except Exception as exc:
+        logger.warning("Failed to initialise Gemini client: %s", exc)
+
+    return _model
 
 
 def enrich_tender(record: dict) -> dict:
     """
     Add `ai_summary` and `ai_tags` to a single tender record dict.
 
-    If the API key is missing, the record is returned unchanged.
+    If the API key is missing or the call fails, the record is returned unchanged.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logger.debug("OPENAI_API_KEY not set — skipping AI enrichment.")
+    model = _get_model()
+    if model is None:
         return record
 
-    try:
-        from openai import OpenAI  # lazy import to avoid hard dependency
+    prompt = _build_prompt(record)
 
-        client = OpenAI(api_key=api_key)
-        prompt = _build_prompt(record)
-        response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.3,
-        )
-        content = response.choices[0].message.content.strip()
-        # Expect format: SUMMARY: ...\nTAGS: tag1, tag2, tag3
-        lines = content.splitlines()
-        summary = next((l.replace("SUMMARY:", "").strip() for l in lines if l.startswith("SUMMARY:")), None)
-        tags = next((l.replace("TAGS:", "").strip() for l in lines if l.startswith("TAGS:")), None)
-        record["ai_summary"] = summary
-        record["ai_tags"] = tags
-    except Exception as exc:  # noqa: BLE001
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+
+        # Strip markdown code fences if the model wraps its output
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.lower().startswith("json"):
+                text = text[4:]
+        text = text.strip()
+
+        parsed = json.loads(text)
+        record["ai_summary"] = str(parsed.get("summary", "")).strip()
+        record["ai_tags"] = str(parsed.get("tags", "")).strip()
+        logger.debug("Enriched bid %s.", record.get("bid_number"))
+
+    except Exception as exc:   # noqa: BLE001
         logger.warning("AI enrichment failed for bid %s: %s", record.get("bid_number"), exc)
 
+    # Stay well within the free-tier 15 RPM limit
+    time.sleep(4)
     return record
 
 
+def enrich_batch(records: list[dict]) -> list[dict]:
+    """
+    Enrich a list of tender records with AI summaries and tags.
+
+    Skips entirely if GEMINI_API_KEY is not set.
+    Returns the original records (possibly enriched in-place).
+    """
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        logger.info("GEMINI_API_KEY not set — skipping AI enrichment.")
+        return records
+
+    total = len(records)
+    logger.info("Starting AI enrichment for %d records ...", total)
+
+    enriched = []
+    for i, record in enumerate(records, start=1):
+        if i % 20 == 0:
+            logger.info("AI enrichment progress: %d / %d", i, total)
+        enriched.append(enrich_tender(record))
+
+    logger.info("AI enrichment complete: %d / %d records processed.", total, total)
+    return enriched
+
+
 def _build_prompt(record: dict) -> str:
-    return (
-        "You are a procurement analyst. Given the following GeM (Government e-Marketplace) "
-        "tender details, provide a one-sentence plain-English summary and 3–5 comma-separated "
-        "category tags (e.g. IT Equipment, Defence, Furniture).\n\n"
-        f"Title: {record.get('title', 'N/A')}\n"
-        f"Department: {record.get('department', 'N/A')}\n"
-        f"Estimated Value (INR): {record.get('estimated_value_inr', 'N/A')}\n"
-        f"Location: {record.get('location', 'N/A')}\n\n"
-        "Respond ONLY in this format:\n"
-        "SUMMARY: <one sentence>\n"
-        "TAGS: <tag1>, <tag2>, <tag3>"
-    )
+    title = record.get("title") or "N/A"
+    department = record.get("department") or "N/A"
+    quantity = record.get("quantity") or "N/A"
+    value = record.get("estimated_value_inr") or "N/A"
+
+    return f"""You are a Government procurement analyst.
+Analyse this GeM (Government e-Marketplace) tender and respond ONLY with valid JSON.
+
+Tender:
+- Category / Item: {title}
+- Buying Department: {department}
+- Quantity: {quantity}
+- Estimated Value (INR): {value}
+
+Respond with exactly this JSON (no markdown, no explanation):
+{{
+  "summary": "<1-2 sentence plain-English explanation of what is being procured and who is buying it>",
+  "tags": "<3 to 5 comma-separated category tags, e.g. IT Equipment, Office Furniture, Medical Supplies>"
+}}"""

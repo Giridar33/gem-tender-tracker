@@ -116,3 +116,41 @@ def test_summary_stats():
     data = resp.json()
     assert "total_tenders" in data
     assert data["total_tenders"] >= 1
+
+
+# ── AI Enrichment endpoint tests ───────────────────────────────────────────────
+
+def test_ai_status_returns_valid_json():
+    """GET /ai/status always returns a JSON object — enabled or not."""
+    resp = client.get("/ai/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "enabled" in data
+    # Without GEMINI_API_KEY the service should report disabled
+    assert data["enabled"] is False
+    assert "reason" in data
+
+
+def test_enrich_single_without_key_returns_503():
+    """POST /tenders/{id}/enrich returns 503 when GEMINI_API_KEY is not set."""
+    results = client.get("/tenders").json()["results"]
+    assert len(results) > 0, "Seed failed — no records found"
+    tender_id = results[0]["id"]
+
+    resp = client.post(f"/tenders/{tender_id}/enrich")
+    assert resp.status_code == 503
+    assert "GEMINI_API_KEY" in resp.json()["detail"]
+
+
+def test_enrich_nonexistent_tender_without_key_returns_503():
+    """POST /tenders/999/enrich — even for missing records, 503 comes first (key check is first guard)."""
+    resp = client.post("/tenders/999999/enrich")
+    assert resp.status_code == 503
+
+
+def test_enrich_batch_without_key_returns_503():
+    """POST /ai/enrich-batch returns 503 when GEMINI_API_KEY is not set."""
+    resp = client.post("/ai/enrich-batch")
+    assert resp.status_code == 503
+    assert "GEMINI_API_KEY" in resp.json()["detail"]
+

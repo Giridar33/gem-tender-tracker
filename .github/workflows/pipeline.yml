@@ -7,7 +7,7 @@ on:
 
 jobs:
   run-pipeline:
-    name: Scrape → Clean → Load
+    name: Scrape → Clean → AI Enrich → Load
     runs-on: ubuntu-latest
 
     steps:
@@ -31,4 +31,4 @@ jobs:
           MAX_PAGES: ${{ vars.MAX_PAGES || '50' }}
           REQUEST_DELAY: ${{ vars.REQUEST_DELAY || '1.5' }}
           REQUEST_TIMEOUT: ${{ vars.REQUEST_TIMEOUT || '15' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}    # optional
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}    # optional — free tier AI enrichment

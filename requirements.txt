@@ -34,5 +34,6 @@ responses==0.25.3          # mock HTTP calls
 # --- Logging & Utils ---
 structlog==24.2.0
 
-# --- Bonus AI/ML (optional) ---
-openai==1.30.1
+# --- Bonus AI/ML (Gemini — FREE tier, no credit card needed) ---
+# Get API key at: https://aistudio.google.com/app/apikey
+google-generativeai>=0.7.0
