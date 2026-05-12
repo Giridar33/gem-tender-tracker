@@ -97,11 +97,34 @@ def _run_batch_enrichment():
     """Background task: enrich all tenders that have no ai_summary yet."""
     global _batch_running
     from src.ai.enrich import enrich_batch
+    from sqlalchemy import func, or_, and_
 
     try:
         with Session(engine) as session:
-            stmt = select(Tender).where(
-                (Tender.ai_summary == None) | (Tender.ai_summary == "")  # noqa: E711
+            stmt = (
+                select(Tender)
+                .where(
+                    (Tender.ai_summary == None) | (Tender.ai_summary == "")  # noqa: E711
+                )
+                # Safety: exclude rows with out-of-range timestamps that crash psycopg3
+                .where(
+                    or_(
+                        Tender.end_date.is_(None),
+                        and_(
+                            func.extract("year", Tender.end_date) >= 1,
+                            func.extract("year", Tender.end_date) <= 9999,
+                        ),
+                    )
+                )
+                .where(
+                    or_(
+                        Tender.start_date.is_(None),
+                        and_(
+                            func.extract("year", Tender.start_date) >= 1,
+                            func.extract("year", Tender.start_date) <= 9999,
+                        ),
+                    )
+                )
             )
             rows = session.execute(stmt).scalars().all()
             records = [_row_to_dict(r) for r in rows]
@@ -116,7 +139,7 @@ def _run_batch_enrichment():
         upsert_tenders(df)
         logger.info("Batch enrichment complete.")
     except Exception as exc:
-        logger.error("Batch enrichment failed: %s", exc)
+        logger.error("Batch enrichment failed: %s", exc, exc_info=True)
     finally:
         _batch_running = False
 

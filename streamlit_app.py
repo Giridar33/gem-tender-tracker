@@ -279,17 +279,23 @@ with st.sidebar:
         st.success(f"Gemini {ai_status.get('model', 'AI')} active")
         st.caption(f"Free tier: {ai_status.get('free_tier_rpm', 15)} req/min")
         if st.button("Run AI Enrichment", use_container_width=True, help="Enriches all tenders that have no AI summary yet"):
-            with st.spinner("Starting batch enrichment..."):
+            with st.spinner("Contacting Railway API..."):
                 try:
                     resp = requests.post(f"{API_BASE}/ai/enrich-batch", timeout=15)
                     if resp.status_code == 200:
-                        st.success("Enrichment started in background! Refresh in a few minutes.")
+                        st.success("Enrichment started!")
+                        st.info(
+                            "Gemini is now summarising tenders in the background "
+                            "(~15/min on free tier). \n\n"
+                            "**Wait 2–3 minutes**, then click **Search** to see "
+                            "AI Enriched badges appear on tender cards."
+                        )
                     elif resp.status_code == 409:
-                        st.warning("A batch job is already running. Please wait.")
+                        st.warning("Already running — please wait a few minutes then click Search.")
                     elif resp.status_code == 503:
-                        st.error("Gemini API key not configured on the server.")
+                        st.error("GEMINI_API_KEY not set on Railway. Add it in Railway → Variables.")
                     else:
-                        st.error(f"Error: {resp.status_code}")
+                        st.error(f"Unexpected error: HTTP {resp.status_code}")
                 except Exception as e:
                     st.error(f"Could not reach API: {e}")
     else:
