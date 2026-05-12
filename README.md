@@ -257,7 +257,8 @@ All data transformation choices are documented in [`docs/cleaning_decisions.md`]
 
 ## Live Demo
 
-> 🔗 **API:** `<add Render/Railway URL here after deployment>`
+> 🔗 **API:** https://web-production-761eb.up.railway.app
+> 📖 **Interactive Docs:** https://web-production-761eb.up.railway.app/docs
 > 📹 **Demo video:** `<add Loom/YouTube link here>`
 
 ---
