@@ -193,16 +193,16 @@ Tests use an **in-memory SQLite database** — no external services required.
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | ✅ | `sqlite:///./gem_tenders.db` | DB connection string |
-| `SCRAPE_BASE_URL` | ❌ | `https://bidplus.gem.gov.in/all-bids` | Source URL |
-| `MAX_PAGES` | ❌ | `50` | Pages per scrape run |
-| `REQUEST_DELAY` | ❌ | `1.5` | Seconds between requests |
-| `REQUEST_TIMEOUT` | ❌ | `15` | HTTP timeout (seconds) |
-| `RUN_DAEMON` | ❌ | `false` | `true` = APScheduler daemon mode |
-| `SCHEDULE_CRON` | ❌ | `0 2 * * *` | Cron expression for daemon mode |
-| `GEMINI_API_KEY` | ❌ | — | Enables Gemini AI enrichment (free tier) |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./gem_tenders.db` | DB connection string |
+| `SCRAPE_BASE_URL` | `https://bidplus.gem.gov.in/all-bids` | Source URL |
+| `MAX_PAGES` | `50` | Pages per scrape run |
+| `REQUEST_DELAY` | `1.5` | Seconds between requests |
+| `REQUEST_TIMEOUT` | `15` | HTTP timeout (seconds) |
+| `RUN_DAEMON` | `false` | `true` = APScheduler daemon mode |
+| `SCHEDULE_CRON` | `0 2 * * *` | Cron expression for daemon mode |
+| `GEMINI_API_KEY` |  — | Enables Gemini AI enrichment (free tier) |
 
 ---
 
