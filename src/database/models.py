@@ -25,11 +25,23 @@ from sqlalchemy.orm import DeclarativeBase, Session
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./gem_tenders.db")
 
+# Build connect_args based on the database type
+if DATABASE_URL.startswith("sqlite"):
+    _connect_args = {"check_same_thread": False}
+elif "psycopg" in DATABASE_URL:
+    # psycopg3 + pgbouncer Transaction pooler (port 6543):
+    # Must disable prepared statements or pgbouncer will reject them.
+    _connect_args = {"prepare_threshold": None}
+else:
+    _connect_args = {}
+
 engine = create_engine(
     DATABASE_URL,
-    # For SQLite: avoid "multiple threads" errors in dev
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args=_connect_args,
     pool_pre_ping=True,
+    # Reduce pool size for Railway free tier (512 MB RAM)
+    pool_size=2,
+    max_overflow=5,
 )
 
 
