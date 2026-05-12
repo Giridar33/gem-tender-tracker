@@ -126,11 +126,18 @@ def get_summary_stats() -> dict:
         avg_value = session.execute(
             select(func.avg(Tender.estimated_value_inr))
         ).scalar()
+        ai_enriched = session.execute(
+            select(func.count()).select_from(Tender).where(
+                Tender.ai_summary.isnot(None),
+                Tender.ai_summary != "",
+            )
+        ).scalar()
         return {
             "total_tenders": total,
             "active_tenders": active,
             "avg_estimated_value_inr": round(avg_value, 2) if avg_value else None,
             "average_estimated_value_inr": round(avg_value, 2) if avg_value else None,
+            "ai_enriched_count": ai_enriched,
         }
 
 
