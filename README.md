@@ -267,11 +267,6 @@ When `GEMINI_API_KEY` is set, `src/ai/enrich.py` adds two fields to every tender
 | `ai_summary` | 1–2 sentence plain-English explanation of what is being procured and who is buying it |
 | `ai_tags` | 3–5 comma-separated procurement category tags (e.g. `IT Equipment, Laptops, Defence`) |
 
-**Why Gemini 1.5 Flash:**
-- ✅ **FREE** — 1,500 requests/day, 15 RPM, no credit card required
-- ✅ High quality structured JSON output for classification tasks
-- ✅ ~1–2 s latency — acceptable for nightly batch enrichment
-- ✅ Official `google-generativeai` Python SDK
 
 **Graceful degradation:** If the key is not set, enrichment is silently skipped — the pipeline and all core API endpoints continue working normally.
 
@@ -297,16 +292,16 @@ tests/test_scraper.py     4 tests  — HTML parser, malformed input, required ke
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | ✅ | `sqlite:///./gem_tenders.db` | PostgreSQL or SQLite connection string |
-| `GEMINI_API_KEY` | ❌ | — | Enables Gemini AI enrichment (free tier) |
-| `SCRAPE_BASE_URL` | ❌ | `https://bidplus.gem.gov.in/all-bids` | GeM scrape source |
-| `MAX_PAGES` | ❌ | `50` | Pages per scrape run |
-| `REQUEST_DELAY` | ❌ | `1.5` | Seconds between page requests (politeness) |
-| `REQUEST_TIMEOUT` | ❌ | `15` | HTTP timeout in seconds |
-| `RUN_DAEMON` | ❌ | `false` | `true` = APScheduler daemon mode |
-| `SCHEDULE_CRON` | ❌ | `0 2 * * *` | Cron expression for daemon mode |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` |`sqlite:///./gem_tenders.db` | PostgreSQL or SQLite connection string |
+| `GEMINI_API_KEY` | — | Enables Gemini AI enrichment (free tier) |
+| `SCRAPE_BASE_URL` | `https://bidplus.gem.gov.in/all-bids` | GeM scrape source |
+| `MAX_PAGES` | `50` | Pages per scrape run |
+| `REQUEST_DELAY` | `1.5` | Seconds between page requests (politeness) |
+| `REQUEST_TIMEOUT` | `15` | HTTP timeout in seconds |
+| `RUN_DAEMON` | `false` | `true` = APScheduler daemon mode |
+| `SCHEDULE_CRON` | `0 2 * * *` | Cron expression for daemon mode |
 
 ---
 
