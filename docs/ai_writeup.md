@@ -3,7 +3,7 @@
 ## What Was Added
 
 The module `src/ai/enrich.py` uses the **Google Gemini 1.5 Flash** model
-(FREE tier — no credit card required) to add two fields to each tender record:
+ to add two fields to each tender record:
 
 | Field | Description |
 |-------|-------------|
@@ -30,26 +30,11 @@ hundreds of tenders needs instant comprehension, plus category-level filtering.
 English and categorises tenders, enabling full-text search and faceted filtering
 by tag — with zero running cost on the free tier.
 
-**Why Gemini 1.5 Flash specifically:**
 
-| Factor | Detail |
-|--------|--------|
-| Cost | **FREE** — 1,500 requests/day, 15 RPM, no credit card |
-| Quality | On par with GPT-3.5 for structured JSON classification tasks |
-| Latency | ~1–2 s per record — acceptable for nightly batch enrichment |
-| Integration | Official `google-generativeai` Python SDK, one `pip install` |
 
 ---
 
-## Trade-offs Considered
 
-| Option | Pros | Cons | Decision |
-|--------|------|------|----------|
-| **Gemini 1.5 Flash (free)** | Zero cost, high quality, no infra | External API dependency | ✅ Chosen |
-| OpenAI GPT-4o-mini | Very high quality | Costs ~$0.15 / 1M tokens | ❌ Unnecessary cost |
-| Local HuggingFace model | No API cost | GPU needed, lower quality | ❌ Overkill for MVP |
-| Rule-based tagging | Zero cost | Brittle, misses edge cases | ❌ Not robust enough |
-| No enrichment | Simplest | Zero added value | ❌ Misses bonus marks |
 
 ---
 
