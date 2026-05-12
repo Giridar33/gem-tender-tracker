@@ -130,7 +130,19 @@ def query_tenders(
             )
         if active_only:
             now = datetime.now(timezone.utc)
-            stmt = stmt.where(Tender.end_date >= now)
+            # Treat NULL end_date as open/active — GeM often omits closing dates.
+            # Also include tenders with a valid future end_date.
+            from sqlalchemy import or_, and_
+            stmt = stmt.where(
+                or_(
+                    Tender.end_date.is_(None),
+                    and_(
+                        func.extract("year", Tender.end_date) >= 1,
+                        func.extract("year", Tender.end_date) <= 9999,
+                        Tender.end_date >= now,
+                    ),
+                )
+            )
 
         stmt = stmt.order_by(Tender.last_updated_at.desc()).limit(limit).offset(offset)
         rows = session.execute(stmt).scalars().all()
@@ -148,8 +160,19 @@ def get_summary_stats() -> dict:
     with Session(engine) as session:
         total = session.execute(select(func.count()).select_from(Tender)).scalar()
         now = datetime.now(timezone.utc)
+        # Active = end_date NULL (open/unknown) OR valid future end_date
+        from sqlalchemy import or_, and_
         active = session.execute(
-            select(func.count()).select_from(Tender).where(Tender.end_date >= now)
+            select(func.count()).select_from(Tender).where(
+                or_(
+                    Tender.end_date.is_(None),
+                    and_(
+                        func.extract("year", Tender.end_date) >= 1,
+                        func.extract("year", Tender.end_date) <= 9999,
+                        Tender.end_date >= now,
+                    ),
+                )
+            )
         ).scalar()
         avg_value = session.execute(
             select(func.avg(Tender.estimated_value_inr))
