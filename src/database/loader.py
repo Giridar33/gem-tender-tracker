@@ -83,13 +83,15 @@ def query_tenders(
 
         if department:
             stmt = stmt.where(
-                Tender.department.isnot(None),
-                Tender.department.ilike(f"%{department}%"),
+                func.lower(func.coalesce(Tender.department, "")).like(
+                    f"%{department.lower()}%"
+                )
             )
         if location:
             stmt = stmt.where(
-                Tender.location.isnot(None),
-                Tender.location.ilike(f"%{location}%"),
+                func.lower(func.coalesce(Tender.location, "")).like(
+                    f"%{location.lower()}%"
+                )
             )
         if min_value is not None:
             stmt = stmt.where(Tender.estimated_value_inr >= min_value)
@@ -97,8 +99,9 @@ def query_tenders(
             stmt = stmt.where(Tender.estimated_value_inr <= max_value)
         if keyword:
             stmt = stmt.where(
-                Tender.title.isnot(None),
-                Tender.title.ilike(f"%{keyword}%"),
+                func.lower(func.coalesce(Tender.title, "")).like(
+                    f"%{keyword.lower()}%"
+                )
             )
         if active_only:
             now = datetime.now(timezone.utc)

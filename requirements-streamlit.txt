@@ -1,0 +1,9 @@
+# Requirements for the Streamlit Cloud deployment ONLY.
+# Configure Streamlit Cloud → Advanced Settings → Requirements file: requirements-streamlit.txt
+#
+# Streamlit itself is pre-installed on Streamlit Cloud.
+# Only list additional packages here.
+
+plotly>=5.22.0
+requests>=2.32.0
+pandas>=2.0.0
