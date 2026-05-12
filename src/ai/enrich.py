@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 
 logger = logging.getLogger(__name__)
@@ -61,19 +62,28 @@ def enrich_tender(record: dict) -> dict:
 
     try:
         response = model.generate_content(prompt)
-        text = response.text.strip()
 
-        # Strip markdown code fences if the model wraps its output
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.lower().startswith("json"):
-                text = text[4:]
-        text = text.strip()
+        # Safely access response text (may raise if blocked by safety filters)
+        try:
+            raw = response.text
+        except ValueError as safety_exc:
+            logger.warning(
+                "Gemini safety filter blocked bid %s: %s",
+                record.get("bid_number"), safety_exc,
+            )
+            time.sleep(4)
+            return record
 
-        parsed = json.loads(text)
-        record["ai_summary"] = str(parsed.get("summary", "")).strip()
-        record["ai_tags"] = str(parsed.get("tags", "")).strip()
-        logger.debug("Enriched bid %s.", record.get("bid_number"))
+        parsed = _extract_json(raw)
+        if parsed is None:
+            logger.warning(
+                "Could not extract JSON from Gemini response for bid %s. Raw: %r",
+                record.get("bid_number"), raw[:200],
+            )
+        else:
+            record["ai_summary"] = str(parsed.get("summary", "")).strip() or None
+            record["ai_tags"]    = str(parsed.get("tags",    "")).strip() or None
+            logger.debug("Enriched bid %s.", record.get("bid_number"))
 
     except Exception as exc:   # noqa: BLE001
         logger.warning("AI enrichment failed for bid %s: %s", record.get("bid_number"), exc)
@@ -81,6 +91,25 @@ def enrich_tender(record: dict) -> dict:
     # Stay well within the free-tier 15 RPM limit
     time.sleep(4)
     return record
+
+
+def _extract_json(text: str) -> dict | None:
+    """Robustly pull the first JSON object out of an arbitrary response string."""
+    # Strip markdown code fences anywhere in the string
+    text = re.sub(r"```(?:json)?\s*", "", text)
+    text = re.sub(r"```", "", text).strip()
+    # Find the outermost { ... } block
+    match = re.search(r"\{.*?\}", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+    # Last resort: try parsing the whole cleaned string
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
 
 
 def enrich_batch(records: list[dict]) -> list[dict]:
