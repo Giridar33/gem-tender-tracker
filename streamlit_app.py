@@ -302,6 +302,10 @@ with st.sidebar:
 min_value = float(min_val_input) if min_val_input.strip() else None
 max_value = float(max_val_input) if max_val_input.strip() else None
 
+# Clear cache on every Search click so Railway changes are reflected immediately
+if submitted:
+    st.cache_data.clear()
+
 # ── Pagination state ───────────────────────────────────────────────────────────
 if "page" not in st.session_state:
     st.session_state.page = 0
