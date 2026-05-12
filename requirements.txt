@@ -1,0 +1,39 @@
+# --- Web Scraping ---
+requests==2.32.3
+beautifulsoup4==4.12.3
+lxml                      # pre-built wheel; version resolved by pip
+tenacity==8.3.0           # exponential-backoff retries
+# playwright is listed separately; install manually if needed:
+#   pip install playwright && playwright install chromium
+
+# --- Data Processing ---
+pandas                    # pre-built wheel
+numpy                     # pre-built wheel
+python-dateutil==2.9.0
+
+# --- Database ---
+sqlalchemy==2.0.49          # Python 3.13 compatible wheel
+# psycopg2-binary requires C++ Build Tools on Windows.
+# For LOCAL DEV: SQLite is used automatically (no driver needed).
+# For PRODUCTION (PostgreSQL): install psycopg2-binary on Linux/Docker:
+#   pip install psycopg2-binary
+alembic==1.13.1
+
+# --- API ---
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-dotenv==1.0.1
+
+# --- Scheduling ---
+apscheduler==3.10.4
+
+# --- Testing ---
+pytest==8.2.0
+httpx==0.27.0              # async test client for FastAPI
+responses==0.25.3          # mock HTTP calls
+
+# --- Logging & Utils ---
+structlog==24.2.0
+
+# --- Bonus AI/ML (optional) ---
+openai==1.30.1
