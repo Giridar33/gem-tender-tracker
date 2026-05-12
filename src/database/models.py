@@ -25,6 +25,13 @@ from sqlalchemy.orm import DeclarativeBase, Session
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./gem_tenders.db").strip()
 
+# SQLAlchemy 2.0 dropped support for plain "postgres://" and requires the
+# explicit driver dialect. Auto-correct common Supabase/Heroku URL formats.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://") and "+psycopg" not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
 # Build connect_args based on the database type
 if DATABASE_URL.startswith("sqlite"):
     _connect_args = {"check_same_thread": False}
