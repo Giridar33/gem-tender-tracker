@@ -35,7 +35,7 @@ GeM Portal (bidplus.gem.gov.in)
             │ clean DataFrame
             ▼
 ┌──────────────────────────────┐
-│  AI Enrichment (Gemini)      │  plain-English summary + category tags (FREE)
+│  AI Enrichment (Gemini)      │  plain-English summary + category tags 
 └───────────┬──────────────────┘
             │ enriched records
             ▼
