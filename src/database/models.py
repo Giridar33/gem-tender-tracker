@@ -23,7 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Session
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./gem_tenders.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./gem_tenders.db").strip()
 
 # Build connect_args based on the database type
 if DATABASE_URL.startswith("sqlite"):
