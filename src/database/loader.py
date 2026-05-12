@@ -81,6 +81,31 @@ def query_tenders(
     with Session(engine) as session:
         stmt = select(Tender)
 
+        # ── Always guard against out-of-range timestamps ───────────────────────
+        # psycopg3 crashes loading timestamps with year > 9999 or < 1.
+        # These bad dates come from raw GeM data like '-0001-11-30T00:00:00Z'.
+        # Filter them out at SQL level so Python never has to deserialise them.
+        from sqlalchemy import or_, and_
+        stmt = stmt.where(
+            or_(
+                Tender.end_date.is_(None),
+                and_(
+                    func.extract("year", Tender.end_date) >= 1,
+                    func.extract("year", Tender.end_date) <= 9999,
+                ),
+            )
+        )
+        stmt = stmt.where(
+            or_(
+                Tender.start_date.is_(None),
+                and_(
+                    func.extract("year", Tender.start_date) >= 1,
+                    func.extract("year", Tender.start_date) <= 9999,
+                ),
+            )
+        )
+
+        # ── User filters ──────────────────────────────────────────────────────
         if department:
             stmt = stmt.where(
                 func.lower(func.coalesce(Tender.department, "")).like(
@@ -147,6 +172,12 @@ def get_summary_stats() -> dict:
 # ── Serialisation ──────────────────────────────────────────────────────────────
 
 def _row_to_dict(row: Tender) -> dict[str, Any]:
+    def safe_iso(dt) -> str | None:
+        try:
+            return dt.isoformat() if dt else None
+        except (ValueError, OverflowError, OSError):
+            return None
+
     return {
         "id": row.id,
         "bid_number": row.bid_number,
@@ -155,11 +186,11 @@ def _row_to_dict(row: Tender) -> dict[str, Any]:
         "location": row.location,
         "quantity": row.quantity,
         "estimated_value_inr": row.estimated_value_inr,
-        "start_date": row.start_date.isoformat() if row.start_date else None,
-        "end_date": row.end_date.isoformat() if row.end_date else None,
+        "start_date": safe_iso(row.start_date),
+        "end_date": safe_iso(row.end_date),
         "source_url": row.source_url,
         "ai_summary": row.ai_summary,
         "ai_tags": row.ai_tags,
-        "scraped_at": row.scraped_at.isoformat() if row.scraped_at else None,
-        "last_updated_at": row.last_updated_at.isoformat() if row.last_updated_at else None,
+        "scraped_at": safe_iso(row.scraped_at),
+        "last_updated_at": safe_iso(row.last_updated_at),
     }
