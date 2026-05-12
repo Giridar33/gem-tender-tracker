@@ -12,7 +12,7 @@ Deploy on: https://streamlit.io/cloud  (free, no credit card)
 from __future__ import annotations
 
 import os
-import math
+
 import requests
 import pandas as pd
 import streamlit as st
@@ -250,36 +250,55 @@ st.markdown("""
 
 # ── Sidebar Filters ────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### Filters")
+    # ── Search form (only triggers on button click) ───────────────────────────
+    with st.form(key="filter_form"):
+        st.markdown("### Filters")
+        st.markdown("---")
+
+        keyword = st.text_input("Keyword Search", placeholder="e.g. laptop, defence, solar")
+        department = st.text_input("Department", placeholder="e.g. Ministry of Defence")
+        location = st.text_input("Location", placeholder="e.g. Delhi, Mumbai")
+
+        st.markdown("**Estimated Value (₹)**")
+        fcol1, fcol2 = st.columns(2)
+        with fcol1:
+            min_val_input = st.text_input("Min", placeholder="e.g. 100000")
+        with fcol2:
+            max_val_input = st.text_input("Max", placeholder="e.g. 5000000")
+
+        active_only = st.checkbox("Active tenders only", value=False)
+        limit = st.selectbox("Records per page", [20, 50, 100], index=0)
+
+        submitted = st.form_submit_button("Search", use_container_width=True, type="primary")
+
+    # ── AI Enrichment ─────────────────────────────────────────────────────────
     st.markdown("---")
-
-    keyword = st.text_input("Keyword Search", placeholder="e.g. laptop, defence, solar")
-    department = st.text_input("Department", placeholder="e.g. Ministry of Defence")
-    location = st.text_input("Location", placeholder="e.g. Delhi, Mumbai")
-
-    st.markdown("**Estimated Value (₹)**")
-    col1, col2 = st.columns(2)
-    with col1:
-        min_val_input = st.text_input("Min", placeholder="e.g. 100000")
-    with col2:
-        max_val_input = st.text_input("Max", placeholder="e.g. 5000000")
-
-    active_only = st.checkbox("Active tenders only", value=False)
-    limit = st.selectbox("Records per page", [20, 50, 100], index=0)
-
-    st.markdown("---")
-    st.markdown("### AI Status")
+    st.markdown("### AI Enrichment")
     ai_status = fetch_ai_status()
     if ai_status.get("enabled"):
         st.success(f"Gemini {ai_status.get('model', 'AI')} active")
         st.caption(f"Free tier: {ai_status.get('free_tier_rpm', 15)} req/min")
+        if st.button("Run AI Enrichment", use_container_width=True, help="Enriches all tenders that have no AI summary yet"):
+            with st.spinner("Starting batch enrichment..."):
+                try:
+                    resp = requests.post(f"{API_BASE}/ai/enrich-batch", timeout=15)
+                    if resp.status_code == 200:
+                        st.success("Enrichment started in background! Refresh in a few minutes.")
+                    elif resp.status_code == 409:
+                        st.warning("A batch job is already running. Please wait.")
+                    elif resp.status_code == 503:
+                        st.error("Gemini API key not configured on the server.")
+                    else:
+                        st.error(f"Error: {resp.status_code}")
+                except Exception as e:
+                    st.error(f"Could not reach API: {e}")
     else:
-        st.warning("AI enrichment inactive")
+        st.warning("AI inactive — set GEMINI_API_KEY on Railway")
 
     st.markdown("---")
     st.caption(f"API: `{API_BASE}`")
 
-# Parse optional value filters
+# Parse optional value filters (use stored values if form not submitted)
 min_value = float(min_val_input) if min_val_input.strip() else None
 max_value = float(max_val_input) if max_val_input.strip() else None
 
