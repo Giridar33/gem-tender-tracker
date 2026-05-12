@@ -48,7 +48,7 @@ def ai_status():
         }
     return {
         "enabled": True,
-        "model": "gemini-1.5-flash",
+        "model": "gemini-2.0-flash",
         "free_tier_rpm": 15,
         "free_tier_daily": 1500,
     }

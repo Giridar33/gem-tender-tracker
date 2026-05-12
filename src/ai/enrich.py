@@ -38,8 +38,8 @@ def _get_model():
     try:
         import google.generativeai as genai  # lazy import
         genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel("gemini-1.5-flash")
-        logger.info("Gemini AI enrichment enabled (gemini-1.5-flash).")
+        _model = genai.GenerativeModel("gemini-2.0-flash")
+        logger.info("Gemini AI enrichment enabled (gemini-2.0-flash).")
     except ImportError:
         logger.warning("google-generativeai not installed. Run: pip install google-generativeai")
     except Exception as exc:
