@@ -5,6 +5,7 @@ All API endpoint definitions.
 
 Endpoints
 ---------
+GET /                   → welcome message with API links
 GET /health             → service health check
 GET /tenders            → filtered, paginated list of tenders
 GET /tenders/{id}       → single tender detail
@@ -18,6 +19,25 @@ from fastapi import APIRouter, HTTPException, Query
 from src.database.loader import get_summary_stats, get_tender_by_id, query_tenders
 
 router = APIRouter()
+
+
+@router.get("/", tags=["Meta"])
+def root():
+    """Welcome page — returns API info and links."""
+    return {
+        "name": "GeM Tender Tracker API",
+        "description": "Live, AI-enriched Government e-Marketplace tender data pipeline.",
+        "version": "1.0.0",
+        "links": {
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "health": "/health",
+            "tenders": "/tenders",
+            "stats": "/stats/summary",
+            "ai_status": "/ai/status",
+        },
+        "source": "https://github.com/Giridar33/gem-tender-tracker",
+    }
 
 
 @router.get("/health", tags=["Meta"])
