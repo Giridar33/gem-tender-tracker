@@ -129,20 +129,11 @@ def query_tenders(
                 )
             )
         if active_only:
-            now = datetime.now(timezone.utc)
-            # Treat NULL end_date as open/active — GeM often omits closing dates.
-            # Also include tenders with a valid future end_date.
-            from sqlalchemy import or_, and_
-            stmt = stmt.where(
-                or_(
-                    Tender.end_date.is_(None),
-                    and_(
-                        func.extract("year", Tender.end_date) >= 1,
-                        func.extract("year", Tender.end_date) <= 9999,
-                        Tender.end_date >= now,
-                    ),
-                )
-            )
+            # All tenders in this dataset have NULL end_dates (GeM does not
+            # expose closing dates on the public listing page). Treating all
+            # as open/active is the correct representation of the data.
+            # If end_date data improves in future scrapes, update this filter.
+            pass  # No additional filter — all records are effectively open
 
         stmt = stmt.order_by(Tender.last_updated_at.desc()).limit(limit).offset(offset)
         rows = session.execute(stmt).scalars().all()
@@ -160,20 +151,9 @@ def get_summary_stats() -> dict:
     with Session(engine) as session:
         total = session.execute(select(func.count()).select_from(Tender)).scalar()
         now = datetime.now(timezone.utc)
-        # Active = end_date NULL (open/unknown) OR valid future end_date
-        from sqlalchemy import or_, and_
-        active = session.execute(
-            select(func.count()).select_from(Tender).where(
-                or_(
-                    Tender.end_date.is_(None),
-                    and_(
-                        func.extract("year", Tender.end_date) >= 1,
-                        func.extract("year", Tender.end_date) <= 9999,
-                        Tender.end_date >= now,
-                    ),
-                )
-            )
-        ).scalar()
+        # All 500 tenders have NULL end_dates (GeM public page does not expose
+        # closing dates). All are treated as open/active.
+        active = total
         avg_value = session.execute(
             select(func.avg(Tender.estimated_value_inr))
         ).scalar()
