@@ -22,30 +22,29 @@ import time
 logger = logging.getLogger(__name__)
 
 # Lazily initialised — only created when the key is present
-_model = None
+_client = None
 
 
 def _get_model():
-    """Return a cached Gemini GenerativeModel, or None if key is missing."""
-    global _model
-    if _model is not None:
-        return _model
+    """Return a cached Gemini client, or None if key is missing."""
+    global _client
+    if _client is not None:
+        return _client
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         return None
 
     try:
-        import google.generativeai as genai  # lazy import
-        genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel("gemini-2.0-flash")
-        logger.info("Gemini AI enrichment enabled (gemini-2.0-flash).")
+        from google import genai  # lazy import (new SDK)
+        _client = genai.Client(api_key=api_key)
+        logger.info("Gemini AI enrichment enabled (gemini-1.5-flash via google-genai SDK).")
     except ImportError:
-        logger.warning("google-generativeai not installed. Run: pip install google-generativeai")
+        logger.warning("google-genai not installed. Run: pip install google-genai")
     except Exception as exc:
         logger.warning("Failed to initialise Gemini client: %s", exc)
 
-    return _model
+    return _client
 
 
 def enrich_tender(record: dict) -> dict:
@@ -54,25 +53,19 @@ def enrich_tender(record: dict) -> dict:
 
     If the API key is missing or the call fails, the record is returned unchanged.
     """
-    model = _get_model()
-    if model is None:
+    client = _get_model()
+    if client is None:
         return record
 
     prompt = _build_prompt(record)
 
     try:
-        response = model.generate_content(prompt)
-
-        # Safely access response text (may raise if blocked by safety filters)
-        try:
-            raw = response.text
-        except ValueError as safety_exc:
-            logger.warning(
-                "Gemini safety filter blocked bid %s: %s",
-                record.get("bid_number"), safety_exc,
-            )
-            time.sleep(4)
-            return record
+        from google import genai as _genai
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
+        )
+        raw = response.text
 
         parsed = _extract_json(raw)
         if parsed is None:

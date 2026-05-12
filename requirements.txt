@@ -36,7 +36,8 @@ structlog==24.2.0
 
 # --- Bonus AI/ML (Gemini — FREE tier, no credit card needed) ---
 # Get API key at: https://aistudio.google.com/app/apikey
-google-generativeai>=0.7.0
+# New google-genai SDK uses v1 API (not v1beta) — supports gemini-1.5-flash correctly
+google-genai>=1.0.0
 
 # NOTE: Streamlit dashboard deps are in requirements-streamlit.txt
 # (used by Streamlit Cloud only — not needed on Railway)

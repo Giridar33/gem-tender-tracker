@@ -57,18 +57,15 @@ def ai_status():
 @ai_router.get("/ai/test-gemini")
 def test_gemini():
     """Debug endpoint: call Gemini with a simple prompt and return the raw response."""
-    model = _get_model()
-    if model is None:
+    client = _get_model()
+    if client is None:
         return {"success": False, "error": "GEMINI_API_KEY not configured"}
     try:
-        response = model.generate_content(
-            'Respond ONLY with this exact JSON: {"summary": "test ok", "tags": "test"}'
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents='Respond ONLY with this exact JSON: {"summary": "test ok", "tags": "test"}',
         )
-        try:
-            raw = response.text
-        except ValueError as e:
-            return {"success": False, "error": f"Safety filter: {e}"}
-        return {"success": True, "raw_response": raw}
+        return {"success": True, "raw_response": response.text}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
