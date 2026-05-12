@@ -31,4 +31,4 @@ jobs:
           MAX_PAGES: ${{ vars.MAX_PAGES || '50' }}
           REQUEST_DELAY: ${{ vars.REQUEST_DELAY || '1.5' }}
           REQUEST_TIMEOUT: ${{ vars.REQUEST_TIMEOUT || '15' }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}    # optional — free tier AI enrichment
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}    
