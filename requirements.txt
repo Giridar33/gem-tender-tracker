@@ -39,5 +39,8 @@ structlog==24.2.0
 # New google-genai SDK uses v1 API (not v1beta) — supports gemini-1.5-flash correctly
 google-genai>=1.0.0
 
-# NOTE: Streamlit dashboard deps are in requirements-streamlit.txt
+# --- Streamlit Dashboard ---
+plotly>=5.22.0            # charts in streamlit_app.py
+
+# NOTE: Streamlit dashboard deps are also in requirements-streamlit.txt
 # (used by Streamlit Cloud only — not needed on Railway)
